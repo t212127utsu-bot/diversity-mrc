@@ -66,35 +66,36 @@ void main_under() {
     std::string out_dir_under = "C:\\Users\\Ide Nanako\\Desktop\\result2";
     std::filesystem::create_directories(out_dir_under);
     
-    std::vector<int> M_values_under = {2, 4, 16, 64, 256};
+    // 対象を変調方式4つに限定
+    std::vector<int> M_values_under = {2, 16, 64, 256};
     
-    for (int L_under = 1; L_under <= 4; ++L_under) {
-        std::string out_file_under = out_dir_under + "\\mrc_ber_results_L" + std::to_string(L_under) + ".csv";
-        std::ofstream f_under(out_file_under);
+    // L=2 のみ実行
+    int L_under = 2;
+    std::string out_file_under = out_dir_under + "\\mrc_ber_results_L" + std::to_string(L_under) + ".csv";
+    std::ofstream f_under(out_file_under);
+    
+    if (f_under.is_open()) {
+        f_under << "EbN0_dB";
+        for (int M_under : M_values_under) {
+            if (M_under == 2) f_under << ",BPSK_BER";
+            else f_under << "," << M_under << "QAM_BER";
+        }
+        f_under << "\n";
         
-        if (f_under.is_open()) {
-            f_under << "EbN0_dB";
+        for (int EbN0_dB_under = 0; EbN0_dB_under <= 30; EbN0_dB_under += 2) {
+            double EbN0_lin_under = std::pow(10.0, EbN0_dB_under / 10.0);
+            f_under << EbN0_dB_under;
+            
             for (int M_under : M_values_under) {
-                if (M_under == 2) f_under << ",BPSK_BER";
-                else f_under << "," << M_under << "QAM_BER";
+                double ber_under = calculate_mrc_ber_under(EbN0_lin_under, L_under, M_under);
+                f_under << "," << ber_under;
             }
             f_under << "\n";
-            
-            for (int EbN0_dB_under = 0; EbN0_dB_under <= 30; EbN0_dB_under += 2) {
-                double EbN0_lin_under = std::pow(10.0, EbN0_dB_under / 10.0);
-                f_under << EbN0_dB_under;
-                
-                for (int M_under : M_values_under) {
-                    double ber_under = calculate_mrc_ber_under(EbN0_lin_under, L_under, M_under);
-                    f_under << "," << ber_under;
-                }
-                f_under << "\n";
-            }
-            f_under.close();
-            std::cout << "L=" << L_under << " calculated and saved to: " << out_file_under << std::endl;
-        } else {
-            std::cerr << "Failed to open " << out_file_under << std::endl;
         }
+        f_under.close();
+        std::cout << "L=" << L_under << " calculated and saved to: " << out_file_under << std::endl;
+    } else {
+        std::cerr << "Failed to open " << out_file_under << std::endl;
     }
 }
 
