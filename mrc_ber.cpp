@@ -4,6 +4,7 @@
 #include <cmath>
 #include <string>
 #include <filesystem>
+#include <algorithm>
 
 unsigned long long nCr_under(int n_under, int r_under) {
     if (r_under < 0 || r_under > n_under) return 0;
@@ -62,44 +63,71 @@ double calculate_mrc_ber_under(double EbN0_lin_under, int L_under, int M_under) 
     return Pb_under;
 }
 
-void main_under() {
+int main(int argc, char* argv[]) {
+    // デフォルトのパラメータ設定 (L=2, M={2, 16, 64, 256}, EbN0: 0～40dB 1dB刻み)
+    std::vector<int> L_values_under = {2};
+    std::vector<int> M_values_under = {2, 16, 64, 256};
+    double ebn0_min_under = 0.0;
+    double ebn0_max_under = 40.0;
+    double ebn0_step_under = 1.0;
+
+    // コマンドライン引数の解析
+    std::vector<std::string> args_under(argv + 1, argv + argc);
+    for (size_t i = 0; i < args_under.size(); ++i) {
+        if (args_under[i] == "--L" || args_under[i] == "-L") {
+            L_values_under.clear();
+            while (i + 1 < args_under.size() && args_under[i + 1][0] != '-') {
+                L_values_under.push_back(std::stoi(args_under[++i]));
+            }
+        } else if (args_under[i] == "--M" || args_under[i] == "-M") {
+            M_values_under.clear();
+            while (i + 1 < args_under.size() && args_under[i + 1][0] != '-') {
+                M_values_under.push_back(std::stoi(args_under[++i]));
+            }
+        } else if (args_under[i] == "--ebn0" || args_under[i] == "-ebn0") {
+            if (i + 3 < args_under.size()) {
+                ebn0_min_under = std::stod(args_under[++i]);
+                ebn0_max_under = std::stod(args_under[++i]);
+                ebn0_step_under = std::stod(args_under[++i]);
+            } else {
+                std::cerr << "Error: --ebn0 requires exactly 3 arguments: min max step." << std::endl;
+                return 1;
+            }
+        }
+    }
+
     std::string out_dir_under = "C:\\Users\\Ide Nanako\\Desktop\\result2";
     std::filesystem::create_directories(out_dir_under);
-    
-    // 対象を変調方式4つに限定
-    std::vector<int> M_values_under = {2, 16, 64, 256};
-    
-    // L=2 のみ実行
-    int L_under = 2;
-    std::string out_file_under = out_dir_under + "\\mrc_ber_results_L" + std::to_string(L_under) + ".csv";
-    std::ofstream f_under(out_file_under);
-    
-    if (f_under.is_open()) {
-        f_under << "EbN0_dB";
-        for (int M_under : M_values_under) {
-            if (M_under == 2) f_under << ",BPSK_BER";
-            else f_under << "," << M_under << "QAM_BER";
-        }
-        f_under << "\n";
+
+    for (int L_under : L_values_under) {
+        std::string out_file_under = out_dir_under + "\\mrc_ber_results_L" + std::to_string(L_under) + ".csv";
+        std::ofstream f_under(out_file_under);
         
-        for (int EbN0_dB_under = 0; EbN0_dB_under <= 30; EbN0_dB_under += 2) {
-            double EbN0_lin_under = std::pow(10.0, EbN0_dB_under / 10.0);
-            f_under << EbN0_dB_under;
-            
+        if (f_under.is_open()) {
+            f_under << "EbN0_dB";
             for (int M_under : M_values_under) {
-                double ber_under = calculate_mrc_ber_under(EbN0_lin_under, L_under, M_under);
-                f_under << "," << ber_under;
+                if (M_under == 2) f_under << ",BPSK_BER";
+                else f_under << "," << M_under << "QAM_BER";
             }
             f_under << "\n";
+            
+            // 小数点誤差を防ぐため 1e-9 を加算してループ
+            for (double EbN0_dB_under = ebn0_min_under; EbN0_dB_under <= ebn0_max_under + 1e-9; EbN0_dB_under += ebn0_step_under) {
+                double EbN0_lin_under = std::pow(10.0, EbN0_dB_under / 10.0);
+                f_under << EbN0_dB_under;
+                
+                for (int M_under : M_values_under) {
+                    double ber_under = calculate_mrc_ber_under(EbN0_lin_under, L_under, M_under);
+                    f_under << "," << ber_under;
+                }
+                f_under << "\n";
+            }
+            f_under.close();
+            std::cout << "L=" << L_under << " calculated and saved to: " << out_file_under << std::endl;
+        } else {
+            std::cerr << "Failed to open " << out_file_under << std::endl;
         }
-        f_under.close();
-        std::cout << "L=" << L_under << " calculated and saved to: " << out_file_under << std::endl;
-    } else {
-        std::cerr << "Failed to open " << out_file_under << std::endl;
     }
-}
-
-int main() {
-    main_under();
+    
     return 0;
 }
